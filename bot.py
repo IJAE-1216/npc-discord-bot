@@ -83,7 +83,7 @@ async def tick_loop():
 # ---------------- 새 글 자동 알림 ----------------
 SESSION = requests.Session()
 SESSION.headers.update({
-    "User-Agent": "Mozilla/5.0 (DiscordBot; NPC Guild Helper)"
+    "User-Agent": "Mozilla/5.0 (DiscordBot; NPC Guild Helper)",
     "Accept-Language": "ko-KR,ko;q=0.9"
 })
 
@@ -116,8 +116,9 @@ def normalize_link(url: str) -> str:
     h = hashlib.sha1(url.encode("utf-8")).hexdigest()
     return h
 
-def fetch_latest_items(name: str, url: str, limit: int = 5):
+
 def fetch_latest_items(name: str, url: str, limit: int = 20):
+    pass
     """
     글 상세로 이어지는 진짜 기사 링크만 수집:
     /News/(Notice|Update|Events|Devnote)/숫자
