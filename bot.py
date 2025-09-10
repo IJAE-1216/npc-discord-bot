@@ -6,6 +6,7 @@ import logging
 import traceback
 from datetime import datetime, timedelta, timezone
 
+import re
 import requests
 from bs4 import BeautifulSoup
 
@@ -83,6 +84,7 @@ async def tick_loop():
 SESSION = requests.Session()
 SESSION.headers.update({
     "User-Agent": "Mozilla/5.0 (DiscordBot; NPC Guild Helper)"
+    "Accept-Language": "ko-KR,ko;q=0.9"
 })
 
 NEWS_SOURCES = {
@@ -115,42 +117,39 @@ def normalize_link(url: str) -> str:
     return h
 
 def fetch_latest_items(name: str, url: str, limit: int = 5):
+def fetch_latest_items(name: str, url: str, limit: int = 20):
     """
-    사이트 구조가 바뀌어도 최대한 버틸 수 있게
-    - 페이지 내의 <a>들 중 'Notice/Update/Events/Devnote'로 이어지는 것 위주로 추림
-    - title/text와 href를 같이 반환
+    글 상세로 이어지는 진짜 기사 링크만 수집:
+    /News/(Notice|Update|Events|Devnote)/숫자
     """
     try:
         r = SESSION.get(url, timeout=10)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
 
-        anchors = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            # 상대경로 보정
-            if href.startswith("/"):
-                href = "https://mabinogimobile.nexon.com" + href
-            # 뉴스 도메인으로 이어지는 링크만 추림
-            if "mabinogimobile.nexon.com" in href and any(
-                seg in href for seg in ("/News/Notice", "/News/Update", "/News/Events", "/News/Devnote")
-            ):
-                title = a.get_text(strip=True)
-                if title:
-                    anchors.append((title, href))
-
-        # 중복 제거, 앞쪽 것 우선
-        seen = set()
+        base = "https://mabinogimobile.nexon.com"
         items = []
-        for title, href in anchors:
-            key = normalize_link(href)
-            if key in seen: continue
-            seen.add(key)
-            items.append({"id": key, "title": title, "link": href})
+        seen_href = set()
+
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if href.startswith("/"):
+                href = base + href
+
+            # 진짜 글만: /News/카테고리/숫자
+            if not re.search(r"/News/(Notice|Update|Events|Devnote)/\d+", href):
+                continue
+
+            if href in seen_href:
+                continue
+            seen_href.add(href)
+
+            title = a.get_text(strip=True) or "(제목 없음)"
+            items.append({"id": normalize_link(href), "title": title, "link": href})
             if len(items) >= limit:
                 break
-        return items
 
+        return items
     except Exception as e:
         logging.warning(f"[news] {name} fetch 실패: {e}")
         return []
